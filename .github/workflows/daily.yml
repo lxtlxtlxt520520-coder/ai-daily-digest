@@ -1,0 +1,72 @@
+name: AI 中文日报
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 预览不调用模型；send 生成日报并发送 Telegram
+        type: choice
+        options: [preview, send, bot]
+        default: preview
+  schedule:
+    - cron: '2-57/5 * * * *' # 约每5分钟检查消息；08:17起每日生成一次
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-daily-digest
+  cancel-in-progress: false
+
+jobs:
+  digest:
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || vars.DIGEST_ENABLED == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - name: 检查代码
+        run: python -m unittest discover -s tests -v
+      - name: 恢复新闻去重缓存
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: state/
+          key: digest-state-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: digest-state-
+      - name: 只采集预览
+        if: github.event_name == 'workflow_dispatch' && inputs.mode == 'preview'
+        run: python -m digest.run
+      - name: 生成并推送日报
+        if: github.event_name == 'workflow_dispatch' && inputs.mode == 'send'
+        run: python -m digest.run --live
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      - name: 接收消息并按需生成日报
+        if: github.event_name == 'schedule' || inputs.mode == 'bot'
+        run: python -m digest.bot --daily
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      - name: 保存新闻去重缓存
+        if: always() && !cancelled() && hashFiles('state/*.json') != '' && (github.event_name == 'schedule' || inputs.mode != 'preview')
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: state/
+          key: digest-state-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: 保存采集和日报结果
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: digest-${{ github.run_id }}
+          path: output/*
+          if-no-files-found: ignore
+          retention-days: 14
