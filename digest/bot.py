@@ -46,7 +46,7 @@ def process_batch(updates, state, persist, acknowledge, owner_id, send, generate
         if not requested:
             send("已收到，正在采集最新资讯并生成中文日报，请稍等。")
             requested = True
-    handled = sum(handle(update, owner_id, send, request_digest, now, max_age=3600) for update in pending)
+    handled = sum(handle(update, owner_id, send, request_digest, now, max_age=86400) for update in pending)
     automatic = daily and daily_due(state, now)
     if automatic:
         state["daily_attempt_date"] = now.astimezone(SHANGHAI).date().isoformat()

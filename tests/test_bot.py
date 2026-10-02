@@ -11,6 +11,18 @@ def update(number, text="/digest"):
 
 
 class BotTests(unittest.TestCase):
+    def test_delayed_schedule_preserves_commands_within_one_day(self):
+        generated = []
+        delayed = update(10)
+        delayed["message"]["date"] -= 7200
+        process_batch([delayed], {"offset": 0}, lambda s: None, lambda o: None, OWNER, lambda t: None,
+                      lambda: generated.append(True), NOW)
+        self.assertEqual(generated, [True])
+        delayed = update(11)
+        delayed["message"]["date"] -= 90000
+        process_batch([delayed], {"offset": 0}, lambda s: None, lambda o: None, OWNER, lambda t: self.fail("old command"),
+                      lambda: self.fail("old command"), NOW)
+
     def test_ack_before_generation_and_batch_coalesced(self):
         calls = []
         state = {"offset": 0}
