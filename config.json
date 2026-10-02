@@ -1,5 +1,6 @@
 {
-  "model": "deepseek-flash",
+  "api_base": "https://api.790053500.com/v1",
+  "model": "deepseek-v4.1-flash",
   "window_hours": 24,
   "max_candidates": 40,
   "max_input_bytes": 12000,

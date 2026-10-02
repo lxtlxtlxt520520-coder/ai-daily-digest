@@ -83,8 +83,13 @@ def main():
                 if "No fresh candidates" in result.stderr or "No eligible candidates" in result.stderr or "No important items" in result.stderr:
                     send("暂时没有适合生成日报的新资讯，未补入旧闻。稍后可以再发送 /digest。")
                     return
-                send("日报生成或发送未完成，请稍后发送 /digest 重试。没有自动重试。")
-                raise StopRun("Digest subprocess failed with exit code " + str(result.returncode))
+                # digest.run emits only controlled error text, never tokens or response bodies.
+                reason = result.stderr.strip()[:300]
+                if "HTTP 401" in reason:
+                    send("日报暂时无法生成：API 密钥认证失败（401）。请检查 GitHub 中的 DEEPSEEK_API_KEY 和密钥所属平台，修正后再发送 /digest。")
+                else:
+                    send("日报生成或发送未完成，请稍后发送 /digest 重试。没有自动重试。")
+                raise StopRun("Digest subprocess failed with exit code " + str(result.returncode) + ": " + reason)
         state = load_cursor(path)
         updates = api("getUpdates", {"offset": state["offset"], "limit": 100, "timeout": 0, "allowed_updates": ["message"]})
         stats = process_batch(updates, state, lambda state: save_cursor(path, state),

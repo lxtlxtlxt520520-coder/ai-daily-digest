@@ -6,6 +6,7 @@ import os
 import sys
 import urllib.error
 import urllib.request
+from urllib.parse import urlsplit
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -17,6 +18,14 @@ SHANGHAI = ZoneInfo("Asia/Shanghai")
 
 class StopRun(RuntimeError):
     pass
+
+
+def model_url(config):
+    base = config["api_base"].rstrip("/")
+    parsed = urlsplit(base)
+    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
+        raise StopRun("Model API base must be an HTTPS endpoint without credentials, query or fragment")
+    return base + "/chat/completions"
 
 
 def load_seen(path):
@@ -175,6 +184,7 @@ def main():
             for secret in ["DEEPSEEK_API_KEY", "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"]:
                 if not os.environ.get(secret):
                     raise StopRun("Missing required Secret: " + secret)
+            endpoint = model_url(config)
         candidates, reports = collect(config, now, seen)
         (output / "sources.json").write_text(json.dumps({"collected_at": now.isoformat(), "reports": reports, "candidates": candidates}, ensure_ascii=False, indent=2))
         if not any(r["status"] == "ok" for r in reports):
@@ -190,7 +200,7 @@ def main():
                               "sources_ok": sum(r["status"] == "ok" for r in reports)}, ensure_ascii=False))
             return
         def model(payload):
-            return post("https://api.deepseek.com/chat/completions", payload, {"Authorization": "Bearer " + os.environ["DEEPSEEK_API_KEY"]})
+            return post(endpoint, payload, {"Authorization": "Bearer " + os.environ["DEEPSEEK_API_KEY"]})
         def telegram(text):
             result = post("https://api.telegram.org/bot" + os.environ["TELEGRAM_BOT_TOKEN"] + "/sendMessage",
                           {"chat_id": os.environ["TELEGRAM_CHAT_ID"], "text": text, "link_preview_options": {"is_disabled": True}})

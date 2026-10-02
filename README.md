@@ -1,15 +1,15 @@
 # AI 中文日报
 
-每天从公开 RSS、GitHub Releases、HN、YouTube 发布信息和免费社区汇总中采集近 24 小时资讯，用 DeepSeek Flash 合并事件、生成中文摘要，并发送到 Telegram。
+每天从公开 RSS、GitHub Releases、HN、YouTube 发布信息和免费社区汇总中采集近 24 小时资讯，通过用户指定的 API 服务调用 DeepSeek Flash 合并事件、生成中文摘要，并发送到 Telegram。
 
 目标 5～15 条，重要资讯不足时少报。只读标题与来源摘录，不抓整篇正文、不处理视频字幕。所有原文链接由程序从来源补入，模型不能添加陌生链接。
 
 ## 当前版本
 
 - Python 3.12，仅使用标准库，无需购买服务器或安装第三方 Python 包。
-- 模型固定为 `deepseek-flash`，关闭思考模式；每次任务最多请求一次模型，失败不自动重试。
+- API 地址为 `https://api.790053500.com/v1`，模型为该端点实际返回的 `deepseek-v4.1-flash`，关闭思考模式；每次任务最多请求一次模型，失败不自动重试。
 - 候选最多 40 条，提示内容最多 12,000 UTF-8 字节，输出最多 3,200 tokens。
-- 根据用户最新决定，不设预算上限，不记录费用或模型用量；费用在 DeepSeek 后台查看。
+- 根据用户最新决定，不设预算上限，不记录费用或模型用量；费用在用户 API 平台后台查看。
 - 新闻去重缓存只记录公开新闻的链接/标题哈希和发送尝试时间，与费用无关。
 - 默认只生成采集预览。自动推送和消息接收由 `DIGEST_ENABLED` 控制。
 
@@ -19,7 +19,7 @@
 
 | Secret | 用途 |
 | --- | --- |
-| `DEEPSEEK_API_KEY` | DeepSeek 调用密钥 |
+| `DEEPSEEK_API_KEY` | 用户指定 API 服务的调用密钥（保留现有 Secret 名称） |
 | `TELEGRAM_BOT_TOKEN` | BotFather 生成的 Token |
 | `TELEGRAM_CHAT_ID` | 接收日报的私人聊天 ID |
 

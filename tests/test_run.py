@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
-from digest.run import StopRun, build_messages, chunks, execute, load_seen, validate_result
+from digest.run import StopRun, build_messages, chunks, execute, load_seen, model_url, validate_result
 
 NOW = datetime(2026, 10, 2, 0, 0, tzinfo=timezone.utc)
 CONFIG = {"model": "deepseek-flash", "max_input_bytes": 12000, "max_output_tokens": 3200}
@@ -17,6 +17,12 @@ def response(result=RESULT, finish="stop"):
 
 
 class RunTests(unittest.TestCase):
+    def test_model_endpoint_uses_configured_provider_path(self):
+        self.assertEqual(model_url({"api_base": "https://api.790053500.com/v1/"}), "https://api.790053500.com/v1/chat/completions")
+        for base in ["http://example.com/v1", "https://key@example.com/v1", "https://example.com/v1?key=private", "https://example.com/v1#fragment"]:
+            with self.assertRaises(StopRun):
+                model_url({"api_base": base})
+
     def test_success_preserves_source_and_caches_news_not_cost(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "seen.json"

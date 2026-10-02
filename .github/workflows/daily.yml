@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 预览不调用模型；send 生成日报并发送 Telegram
+        description: preview 采集预览；send 推送日报；bot 检查消息
         type: choice
         options: [preview, send, bot]
         default: preview
