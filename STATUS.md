@@ -69,4 +69,7 @@
 - GitHub采集今日趋势、真实总星数/当日新增与高星搜索。X仅免费转述，名单为emollick/simonw/bcherny，博客补充；不自动购买X接口。
 - 成长使用James Clear公开通讯（旧RSS停留在2019年，已改为读取文章列表）、Stanford GSB和Greater Good。科研支持Nature的RDF格式并只选研究论文；心理学使用APS。NIH读取403，健康改用实际可读取的Cleveland Clinic。
 - 39项单元测试通过。最新预览采集56条候选、16个来源成功，覆盖全部7类；AINews转述及Stanford最近窗口无合格条目。栏目名额不足会明确说明，不编造近期帖子或热度。
-- 实际GitHub部署与新栏目日报推送待本次验证；源码、来源结果和预览位于项目及上级artifacts/expanded-preview。
+- 部署提交 `2cb1c36993bbc4892a5d1afb71a0d9a7c065753d`；GitHub CI `36968868633` 成功，新栏目真实运行 `36968913142` 于北京时间13:26启动、13:28完成，全程2分40秒，39项测试通过。
+- 实际生成10条、`parts_sent=1`，Telegram API确认接收。栏目分布：GitHub3、AI技巧2、成长2、健康1、科研1、心理学1、重大AI0；缓存和结果附件保存成功。
+- 已核对实际正文：项目星数与趋势、博客技巧、成长建议、健康科普、Nature研究摘要和心理学数据转述均有原链接、行动建议及证据局限。两条技巧本次均来自Simon原创博客，未宣称是X高赞帖子；本次未选出重大AI事件，没有强行补足。
+- 源码位于本项目，采集预览位于上级 `artifacts/expanded-preview/`，实际推送正文副本为 `artifacts/expanded-digest-sent.txt`，成功页面截图为 `artifacts/expanded-digest-run.png`。07:00实际到达时间仍待次日观察，GitHub调度可能延迟。
