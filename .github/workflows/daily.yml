@@ -9,7 +9,8 @@ on:
         options: [preview, send, bot]
         default: preview
   schedule:
-    - cron: '2-57/5 * * * *' # 约每5分钟检查消息；08:17起每日生成一次
+    - cron: '0 23 * * *' # UTC 23:00 = 北京时间次日07:00，触发每日推送
+    - cron: '2-57/5 * * * *' # 约每5分钟检查消息，并补偿延迟的每日推送
 
 permissions:
   contents: read

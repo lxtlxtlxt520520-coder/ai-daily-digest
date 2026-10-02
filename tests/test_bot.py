@@ -2,7 +2,7 @@ import unittest
 from datetime import datetime, timezone
 from digest.bot import daily_due, process_batch
 
-NOW = datetime(2026, 10, 2, 0, 17, tzinfo=timezone.utc)
+NOW = datetime(2026, 10, 1, 23, 0, tzinfo=timezone.utc)
 OWNER = 12345
 
 
@@ -11,6 +11,15 @@ def update(number, text="/digest"):
 
 
 class BotTests(unittest.TestCase):
+    def test_daily_starts_at_seven_shanghai_and_resets_next_day(self):
+        state = {"daily_attempt_date": "2026-10-01"}
+        self.assertFalse(daily_due(state, datetime(2026, 10, 1, 22, 59, tzinfo=timezone.utc)))
+        self.assertTrue(daily_due(state, NOW))
+        self.assertTrue(daily_due(state, datetime(2026, 10, 2, 1, 0, tzinfo=timezone.utc)))
+        state["daily_attempt_date"] = "2026-10-02"
+        self.assertFalse(daily_due(state, NOW))
+        self.assertTrue(daily_due(state, datetime(2026, 10, 2, 23, 0, tzinfo=timezone.utc)))
+
     def test_delayed_schedule_preserves_commands_within_one_day(self):
         generated = []
         delayed = update(10)
@@ -41,9 +50,14 @@ class BotTests(unittest.TestCase):
         process_batch([update(10)], state, lambda s: None, lambda o: None, OWNER, lambda t: None, lambda: generated.append(True), NOW, daily=True)
         self.assertEqual(generated, [True])
         self.assertFalse(daily_due(state, NOW))
+        stats = process_batch([update(11, "生成日报")], state, lambda s: None, lambda o: None, OWNER,
+                              lambda t: None, lambda: generated.append(True), NOW, daily=True)
+        self.assertEqual(generated, [True, True])
+        self.assertTrue(stats["digest_requested"])
+        self.assertFalse(stats["daily_attempt"])
 
     def test_no_message_and_not_morning_does_not_call_model(self):
-        earlier = datetime(2026, 10, 1, 23, 0, tzinfo=timezone.utc)
+        earlier = datetime(2026, 10, 1, 22, 59, tzinfo=timezone.utc)
         process_batch([], {"offset": 0}, lambda s: None, lambda o: None, OWNER, lambda t: self.fail("must not reply"),
                       lambda: self.fail("must not generate"), earlier, daily=True)
 

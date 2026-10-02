@@ -30,7 +30,7 @@ def save_cursor(path, state):
 
 def daily_due(state, now):
     local = now.astimezone(SHANGHAI)
-    return (local.hour, local.minute) >= (8, 17) and state.get("daily_attempt_date") != local.date().isoformat()
+    return (local.hour, local.minute) >= (7, 0) and state.get("daily_attempt_date") != local.date().isoformat()
 
 
 def process_batch(updates, state, persist, acknowledge, owner_id, send, generate, now, daily=False):

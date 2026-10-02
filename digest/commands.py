@@ -1,7 +1,7 @@
 """Only the configured owner's private chat can request a paid digest."""
 from datetime import datetime, timezone
 
-HELP = "你好，我是 AI 中文日报机器人。\n\n/digest 或发送「生成日报」：采集最新资讯并生成中文日报\n/help：查看使用方式\n\n约每5分钟检查消息，可能因调度延迟更久；每天早上自动推送日报。"
+HELP = "你好，我是 AI 中文日报机器人。\n\n/digest 或发送「生成日报」：采集最新资讯并生成中文日报\n/help：查看使用方式\n\n每天北京时间早上7点触发自动日报；GitHub调度与生成可能延迟。约每5分钟检查消息，可能因调度延迟更久。"
 
 
 def handle(update, owner_id, send, generate, now=None, max_age=600):
