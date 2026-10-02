@@ -125,8 +125,9 @@ def execute(config, candidates, reports, seen_path, call_model, send_message, no
     if not candidates:
         raise StopRun("No fresh candidates; no model call or message")
     messages, allowed = build_messages(candidates, config)
-    payload = {"model": config["model"], "messages": messages, "max_tokens": config["max_output_tokens"],
-               "thinking": {"type": "disabled"}, "response_format": {"type": "json_object"}, "temperature": 0.2, "stream": False}
+    payload = {"model": config["model"], "messages": messages,
+               "max_completion_tokens": config["max_completion_tokens"], "reasoning_effort": config["reasoning_effort"],
+               "response_format": {"type": "json_object"}, "stream": False}
     response = call_model(payload)  # Exactly one paid attempt; never retry.
     choice = response["choices"][0]
     if choice["finish_reason"] != "stop":
@@ -150,11 +151,11 @@ def execute(config, candidates, reports, seen_path, call_model, send_message, no
     return text, {"items": len(items), "parts_sent": len(parts)}
 
 
-def post(url, payload, headers=None):
+def post(url, payload, headers=None, timeout=90):
     request = urllib.request.Request(url, data=json.dumps(payload, ensure_ascii=False).encode(),
                                      headers={"Content-Type": "application/json", **(headers or {})}, method="POST")
     try:
-        with urllib.request.urlopen(request, timeout=90) as response:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
             body = response.read(1_000_001)
         if len(body) > 1_000_000:
             raise StopRun("API response exceeded size limit")
@@ -200,7 +201,7 @@ def main():
                               "sources_ok": sum(r["status"] == "ok" for r in reports)}, ensure_ascii=False))
             return
         def model(payload):
-            return post(endpoint, payload, {"Authorization": "Bearer " + os.environ["DEEPSEEK_API_KEY"]})
+            return post(endpoint, payload, {"Authorization": "Bearer " + os.environ["DEEPSEEK_API_KEY"]}, timeout=180)
         def telegram(text):
             result = post("https://api.telegram.org/bot" + os.environ["TELEGRAM_BOT_TOKEN"] + "/sendMessage",
                           {"chat_id": os.environ["TELEGRAM_CHAT_ID"], "text": text, "link_preview_options": {"is_disabled": True}})

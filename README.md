@@ -1,14 +1,14 @@
 # AI 中文日报
 
-每天从公开 RSS、GitHub Releases、HN、YouTube 发布信息和免费社区汇总中采集近 24 小时资讯，通过用户指定的 API 服务调用 DeepSeek Flash 合并事件、生成中文摘要，并发送到 Telegram。
+每天从公开 RSS、GitHub Releases、HN、YouTube 发布信息和免费社区汇总中采集近 24 小时资讯，通过用户指定的 API 服务调用 GPT-6.1 Sol 合并事件、生成中文摘要，并发送到 Telegram。
 
 目标 5～15 条，重要资讯不足时少报。只读标题与来源摘录，不抓整篇正文、不处理视频字幕。所有原文链接由程序从来源补入，模型不能添加陌生链接。
 
 ## 当前版本
 
 - Python 3.12，仅使用标准库，无需购买服务器或安装第三方 Python 包。
-- API 地址为 `https://api.790053500.com/v1`，模型为该端点实际返回的 `deepseek-v4.1-flash`，关闭思考模式；每次任务最多请求一次模型，失败不自动重试。
-- 候选最多 40 条，提示内容最多 12,000 UTF-8 字节，输出最多 3,200 tokens。
+- API 地址为 `https://api.790053500.com/v1`，模型为该端点实际列出的 `gpt-6.1-sol`，推理强度为 `medium`（中等）；每次任务最多请求一次模型，失败不自动重试。
+- 候选最多 40 条，提示内容最多 12,000 UTF-8 字节，推理与可见输出合计最多 8,192 tokens；摘要内容仍按原有条数和长度校验。
 - 根据用户最新决定，不设预算上限，不记录费用或模型用量；费用在用户 API 平台后台查看。
 - 新闻去重缓存只记录公开新闻的链接/标题哈希和发送尝试时间，与费用无关。
 - 默认只生成采集预览。自动推送和消息接收由 `DIGEST_ENABLED` 控制。
@@ -61,13 +61,14 @@ python3 -m digest.run --live
 - 没有发布日期、超过 24 小时、明显在未来的条目会过滤；失败来源会显示在报告和日报中。
 - 仅用来源摘录概括，重要细节请看原文；未经核验的社区说法要求模型标注。
 - 去重缓存可能被 GitHub 回收；丢失后同一条近 24 小时新闻可能再次出现。遇到发送超时，不盲目重发，避免重复；这也可能导致某条日报漏送，需查看 Actions 结果。
-- 同一事件的合并依赖模型判断，尚需真实试跑观察摘要质量。
+- 同一事件的合并依赖模型判断，需通过真实试跑观察摘要质量。
 - GitHub 公开仓库连续 60 天无活动时可能自动停用定时任务，需要在 Actions 页面重新启用。
 
 ## 参考
 
-- [DeepSeek 模型与价格](https://api-docs.deepseek.com/zh-cn/quick_start/pricing/)
-- [DeepSeek Chat Completions](https://api-docs.deepseek.com/api/create-chat-completion/)
+- [GPT-6.1 Sol 官方模型说明](https://developers.openai.com/api/docs/models/gpt-6.1-sol)
+- [GPT 推理参数及兼容说明](https://developers.openai.com/api/docs/guides/latest-model)
+- [Chat Completions 接口](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create)
 - [Telegram Bot API](https://core.telegram.org/bots/api)
 - [HN 搜索 API](https://hn.algolia.com/api)
 - [GitHub 定时触发说明](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)

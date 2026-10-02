@@ -7,7 +7,7 @@ from pathlib import Path
 from digest.run import StopRun, build_messages, chunks, execute, load_seen, model_url, validate_result
 
 NOW = datetime(2026, 10, 2, 0, 0, tzinfo=timezone.utc)
-CONFIG = {"model": "deepseek-flash", "max_input_bytes": 12000, "max_output_tokens": 3200}
+CONFIG = {"model": "gpt-6.1-sol", "reasoning_effort": "medium", "max_input_bytes": 12000, "max_completion_tokens": 8192}
 CANDIDATES = [{"id": "C001", "title": "An AI model release", "summary": "A model is released.", "source": "Official", "kind": "rss", "published": "2026-10-01T12:00:00+00:00", "url": "https://example.com/release", "keys": ["url:a", "title:a"]}]
 RESULT = {"items": [{"title": "模型发布", "summary": "官方公布新模型，具体能力可查看原文。", "source_ids": ["C001"]}]}
 
@@ -32,8 +32,11 @@ class RunTests(unittest.TestCase):
                 return response()
             text, stats = execute(CONFIG, CANDIDATES, [], path, model, sent.append, NOW)
             self.assertEqual(len(calls), 1)
-            self.assertEqual(calls[0]["thinking"], {"type": "disabled"})
-            self.assertEqual(calls[0]["max_tokens"], 3200)
+            self.assertEqual(calls[0]["model"], "gpt-6.1-sol")
+            self.assertEqual(calls[0]["reasoning_effort"], "medium")
+            self.assertEqual(calls[0]["max_completion_tokens"], 8192)
+            for unsupported in ["thinking", "temperature", "max_tokens"]:
+                self.assertNotIn(unsupported, calls[0])
             self.assertEqual(stats["items"], 1)
             self.assertIn("https://example.com/release", text)
             self.assertEqual(set(load_seen(path)), {"url:a", "title:a"})

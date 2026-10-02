@@ -1,10 +1,11 @@
 {
   "api_base": "https://api.790053500.com/v1",
-  "model": "deepseek-v4.1-flash",
+  "model": "gpt-6.1-sol",
+  "reasoning_effort": "medium",
   "window_hours": 24,
   "max_candidates": 40,
   "max_input_bytes": 12000,
-  "max_output_tokens": 3200,
+  "max_completion_tokens": 8192,
   "sources": [
     {"name": "OpenAI 官方资讯", "kind": "rss", "url": "https://openai.com/news/rss.xml", "limit": 6},
     {"name": "Hugging Face 博客", "kind": "rss", "url": "https://huggingface.co/blog/feed.xml", "limit": 6},
