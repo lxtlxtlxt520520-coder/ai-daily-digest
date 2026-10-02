@@ -1,16 +1,16 @@
 # AI 中文日报
 
-每天从公开 RSS、GitHub Releases、HN、YouTube 发布信息和免费社区汇总中采集近 24 小时资讯，通过用户指定的 API 服务调用 GPT-6.1 Sol 合并事件、生成中文摘要，并发送到 Telegram。
+每天从官方公告、GitHub、AI实践作者、成长文章、医疗机构与科研来源中精选内容，通过用户指定的 API 服务调用 GPT-6.1 Sol 生成中文摘要，并发送到 Telegram。
 
-目标 5～15 条，重要资讯不足时少报。只读标题与来源摘录，不抓整篇正文、不处理视频字幕。所有原文链接由程序从来源补入，模型不能添加陌生链接。
+日常目标10条：GitHub项目3条、AI技巧2条、成长2条，健康、科研、心理学各1条；重大AI事件有才报，最多额外3条。不足时少报，不补广告、小更新或重复内容。读取公开标题、元数据和有限摘录，不保存完整文章。所有链接由程序从来源补入，模型不能添加陌生链接。
 
 ## 当前版本
 
 - Python 3.12，仅使用标准库，无需购买服务器或安装第三方 Python 包。
 - API 地址为 `https://api.790053500.com/v1`，模型为该端点实际列出的 `gpt-6.1-sol`，推理强度为 `medium`（中等）；每次任务最多请求一次模型，失败不自动重试。
-- 候选最多 40 条，提示内容最多 12,000 UTF-8 字节，推理与可见输出合计最多 8,192 tokens；摘要内容仍按原有条数和长度校验。
+- 候选最多56条，提示内容最多28,000 UTF-8字节，推理与可见输出合计最多8,192 tokens；各栏目名额、来源ID、证据说明和内容长度由程序校验。
 - 根据用户最新决定，不设预算上限，不记录费用或模型用量；费用在用户 API 平台后台查看。
-- 新闻去重缓存只记录公开新闻的链接/标题哈希和发送尝试时间，与费用无关。
+- 去重缓存只记录公开内容的链接/标题哈希和发送尝试时间，保留90天，与费用无关。
 - 默认只生成采集预览。自动推送和消息接收由 `DIGEST_ENABLED` 控制。
 
 ## GitHub 配置
@@ -24,6 +24,8 @@
 | `TELEGRAM_CHAT_ID` | 接收日报的私人聊天 ID |
 
 密钥只放 Secrets，不写入源码、README 或日志。接收者需要先给机器人发送 `/start`。开启 GitHub 轮询后会回复 `/start`、`/help` 和普通消息；发送 `/digest` 或「生成日报」可请求最新日报。只接受配置的私人聊天，其他用户不能触发模型调用。普通消息只回复使用提示，不发送私人聊天内容给模型。
+
+GitHub查询使用工作流已有的临时 `github.token`，权限仍为 `contents: read`；无需新增个人令牌，令牌只发送给GitHub API且不跟随重定向。
 
 ## 先预览，再手动试跑
 
@@ -53,15 +55,25 @@ python3 -m digest.run --live
 
 ## 来源和边界
 
-来源配置在 `config.json`：OpenAI、Hugging Face、Google 博客，Ollama/vLLM/Transformers Releases，HN AI 讨论，OpenAI YouTube，AINews 社区汇总。
+来源与每类时间窗口均配置在 `config.json`：
 
-- X 来源为 [AINews](https://news.smol.ai/) 的公开汇总，同时可能包含 Reddit/Discord；不直接登录 X，不保证覆盖任意账号。汇总日期太旧时不会补进日报。
-- HN 按 AI 查询采集，属于讨论来源，不能作为官方公告的替代品。
-- YouTube 只报告视频发布时间和标题，不生成整段视频摘要。
-- 没有发布日期、超过 24 小时、明显在未来的条目会过滤；失败来源会显示在报告和日报中。
-- 仅用来源摘录概括，重要细节请看原文；未经核验的社区说法要求模型标注。
-- 去重缓存可能被 GitHub 回收；丢失后同一条近 24 小时新闻可能再次出现。遇到发送超时，不盲目重发，避免重复；这也可能导致某条日报漏送，需查看 Actions 结果。
-- 同一事件的合并依赖模型判断，需通过真实试跑观察摘要质量。
+| 栏目 | 内容来源 | 时间范围 |
+| --- | --- | --- |
+| GitHub 3条 | 今日Trending、高星Skills与自动化项目搜索 | 当日热度采样；搜索排除归档和fork，要求近180天有推送 |
+| AI技巧 2条 | Ethan Mollick、Simon Willison原创文章；AINews中指定X作者转述 | 原创文章近30天；X转述近72小时 |
+| 成长 2条 | James Clear公开通讯、Stanford GSB、Berkeley Greater Good | 近90天，保留实际发布日期 |
+| 健康 1条 | Cleveland Clinic公开健康科普 | 近90天 |
+| 科研 1条 | Nature研究论文，排除新闻、勘误和撤稿通知 | 近7天 |
+| 心理学 1条 | APS心理科学协会 | 近30天，过滤协会事务 |
+| AI重大动态 | OpenAI、Google AI、Anthropic、Hugging Face | 近72小时，重大事件才入选 |
+
+- GitHub优先总星数至少1,000的相关项目；Trending中允许总星数至少300且当日新增至少100的项目。总星数和当日新增来自真实GitHub数据；搜索结果没有增长数据时不编造。采样日期不是项目发布日，源码可见也不等于宽松开源授权。
+- X只从免费 [AINews](https://news.smol.ai/) 转述中筛选 `emollick`、`simonw`、`bcherny` 原帖链接，不直接登录X、不调用付费X API、不保证账号覆盖。转述明确标注来源；没有近期合格转述时由原创博客技巧补充，不能冒充X高赞榜。
+- 原Ollama/vLLM/Transformers常规版本、HN泛讨论和YouTube发布信息已退出固定来源。AI重大动态不选普通修复、微小跑分提升、企业合作或宣传文章。
+- 成长区分作者观点和研究；健康、科研、心理学必须标明证据性质或信息不足。单项、动物或初步研究不推断成人体因果结论，不提供个性化用药建议。
+- 日期缺失、超出所属栏目时间范围或明显在未来的条目会过滤；文章读取部分失败也记录，不把失败显示为全部成功。NIH两个源在验证时返回403，当前由实际可读取的Cleveland Clinic补充。
+- 去重缓存可能被GitHub回收；丢失后可能重复推送。Telegram发送超时不盲目重发，也可能导致漏送，需查看Actions结果。
+- 栏目选题、重大程度和摘要仍依赖模型判断；名额是上限，不保证每天凑满10条。
 - GitHub 公开仓库连续 60 天无活动时可能自动停用定时任务，需要在 Actions 页面重新启用。
 
 ## 参考
@@ -70,7 +82,7 @@ python3 -m digest.run --live
 - [GPT 推理参数及兼容说明](https://developers.openai.com/api/docs/guides/latest-model)
 - [Chat Completions 接口](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create)
 - [Telegram Bot API](https://core.telegram.org/bots/api)
-- [HN 搜索 API](https://hn.algolia.com/api)
+- [GitHub Trending](https://github.com/trending)
 - [GitHub 定时触发说明](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)
 
 交付和验证状态见 [STATUS.md](STATUS.md)。

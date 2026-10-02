@@ -2,6 +2,7 @@
 import hashlib
 import html
 import json
+import os
 import re
 import urllib.parse
 import urllib.request
@@ -17,7 +18,10 @@ AI_WORDS = re.compile(r"\b(ai|llm|gpt|claude|gemini|deepseek|openai|anthropic|ag
 def download(url, timeout=18):
     if urllib.parse.urlsplit(url).scheme != "https":
         raise ValueError("Only HTTPS sources are allowed")
-    request = urllib.request.Request(url, headers={"User-Agent": "AI-Daily-Digest/1.0", "Accept-Encoding": "identity"})
+    headers = {"User-Agent": "AI-Daily-Digest/1.0", "Accept-Encoding": "identity"}
+    request = urllib.request.Request(url, headers=headers)
+    if urllib.parse.urlsplit(url).hostname == "api.github.com" and os.environ.get("GITHUB_TOKEN"):
+        request.add_unredirected_header("Authorization", "Bearer " + os.environ["GITHUB_TOKEN"])
     with urllib.request.urlopen(request, timeout=timeout) as response:
         body = response.read(MAX_DOWNLOAD + 1)
     if len(body) > MAX_DOWNLOAD:
@@ -60,8 +64,9 @@ def item(title, url, published, summary, source):
         return None
     # Identical version numbers in different repositories are different events.
     title_key = fingerprint((source["name"] if source["kind"] == "github" else "") + re.sub(r"[^\w]+", "", title.casefold()))
-    return {"title": title, "url": url, "published": published.isoformat(), "summary": clean(summary),
-            "source": source["name"], "kind": source["kind"], "keys": ["url:" + fingerprint(url), "title:" + title_key]}
+    return {"title": title, "url": url, "published": published.isoformat(), "summary": clean(summary, 650),
+            "source": source["name"], "kind": source["kind"], "category": source.get("category", "major_ai"),
+            "keys": ["url:" + fingerprint(url), "title:" + title_key]}
 
 
 def parse_feed(body, source):
@@ -69,16 +74,24 @@ def parse_feed(body, source):
         raise ValueError("XML declarations are not allowed")
     root = ET.fromstring(body)
     records = []
-    for entry in root.findall("./channel/item") + root.findall("./{http://www.w3.org/2005/Atom}entry"):
+    for entry in root.findall("./channel/item") + root.findall("./{http://www.w3.org/2005/Atom}entry") + root.findall("./{http://purl.org/rss/1.0/}item"):
         fields = {node.tag.split("}")[-1]: node for node in entry}
         def value(name):
             node = fields.get(name)
             return "" if node is None else "".join(node.itertext())
         links = [node for node in entry if node.tag.split("}")[-1] == "link"]
         url = next((node.get("href") for node in links if node.get("href") and node.get("rel", "alternate") == "alternate"), value("link"))
-        published = parse_date(value("published") or value("pubDate") or value("date") or value("updated"))
+        date_text = value("published") or value("pubDate") or value("date") or value("updated")
+        # Some publisher feeds provide an explicit calendar date rather than a time.
+        published = parse_date(date_text + "T00:00:00Z" if re.fullmatch(r"\d{4}-\d{2}-\d{2}", date_text) else date_text)
+        excerpt = value("description") or value("summary") or value("content") or value("encoded")
+        if source.get("practical_excerpt"):
+            from .pages import Page
+            page = Page((value("encoded") or value("content") or value("summary") or excerpt).encode())
+            practical = [p for p in page.paragraphs if re.search(r"\b(try|use|using|ask|prompt|workflow|step|tip|example|you can)\b", p, re.I)]
+            excerpt = " ".join(practical[:3]) or excerpt
         try:
-            record = item(value("title"), url, published, value("description") or value("summary") or value("content"), source)
+            record = item(value("title"), url, published, excerpt, source)
         except ValueError:
             continue
         if record:
@@ -87,8 +100,21 @@ def parse_feed(body, source):
 
 
 def fetch_source(source, now, window_hours, fetch=download):
+    window_hours = source.get("window_hours", window_hours)
     url = source["url"]
-    if source["kind"] == "hn":
+    failures = []
+    if source["kind"] in {"github_search", "github_trending"}:
+        from .projects import fetch_projects
+        records = fetch_projects(source, now, fetch)
+    elif source["kind"] == "articles":
+        from .pages import fetch_articles
+        records = fetch_articles(source, fetch, failures)
+        if failures and not records:
+            raise ValueError("All article reads failed")
+    elif source["kind"] == "x_excerpts":
+        from .pages import fetch_x_excerpts
+        records = fetch_x_excerpts(source, fetch)
+    elif source["kind"] == "hn":
         query = urllib.parse.urlencode({"tags": "story", "query": "AI", "hitsPerPage": 50,
                                        "numericFilters": "created_at_i>" + str(int((now - timedelta(hours=window_hours)).timestamp()))})
         raw = json.loads(fetch(url + "?" + query))["hits"]
@@ -105,9 +131,13 @@ def fetch_source(source, now, window_hours, fetch=download):
         records = parse_feed(fetch(url), source)
     cutoff = now - timedelta(hours=window_hours)
     fresh = [r for r in records if cutoff <= parse_date(r["published"]) <= now + timedelta(minutes=5)
-             and (not source.get("ai_filter") or AI_WORDS.search(r["title"] + " " + r["summary"]))]
+             and (not source.get("ai_filter") or AI_WORDS.search(r["title"] + " " + r["summary"]))
+             and (not source.get("include_pattern") or re.search(source["include_pattern"], r["title"] + " " + r["summary"], re.I))
+             and (not source.get("url_pattern") or re.search(source["url_pattern"], r["url"]))
+             and (not source.get("exclude_pattern") or not re.search(source["exclude_pattern"], r["title"], re.I))]
     fresh.sort(key=lambda r: r["published"], reverse=True)
-    return fresh[:source.get("limit", 6)], {"source": source["name"], "kind": source["kind"], "status": "ok", "raw": len(records), "fresh": len(fresh)}
+    return fresh[:source.get("limit", 6)], {"source": source["name"], "kind": source["kind"], "status": "partial" if failures else "ok",
+                                           "raw": len(records), "fresh": len(fresh), "article_failures": len(failures)}
 
 
 def collect(config, now=None, sent_keys=(), fetch=download):

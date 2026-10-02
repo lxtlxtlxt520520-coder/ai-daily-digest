@@ -3,18 +3,173 @@
   "model": "gpt-6.1-sol",
   "reasoning_effort": "medium",
   "window_hours": 24,
-  "max_candidates": 40,
-  "max_input_bytes": 12000,
+  "max_candidates": 56,
+  "max_input_bytes": 28000,
   "max_completion_tokens": 8192,
   "sources": [
-    {"name": "OpenAI 官方资讯", "kind": "rss", "url": "https://openai.com/news/rss.xml", "limit": 6},
-    {"name": "Hugging Face 博客", "kind": "rss", "url": "https://huggingface.co/blog/feed.xml", "limit": 6},
-    {"name": "Google 官方博客", "kind": "rss", "url": "https://blog.google/rss/", "limit": 6, "ai_filter": true},
-    {"name": "Ollama Releases", "kind": "github", "url": "https://github.com/ollama/ollama/releases.atom", "limit": 3},
-    {"name": "vLLM Releases", "kind": "github", "url": "https://github.com/vllm-project/vllm/releases.atom", "limit": 3},
-    {"name": "Transformers Releases", "kind": "github", "url": "https://github.com/huggingface/transformers/releases.atom", "limit": 3},
-    {"name": "Hacker News AI 讨论", "kind": "hn", "url": "https://hn.algolia.com/api/v1/search_by_date", "limit": 8},
-    {"name": "OpenAI YouTube 发布", "kind": "youtube", "url": "https://www.youtube.com/feeds/videos.xml?channel_id=UCXZCJLdBC09xxGZ6gcdrc6A", "limit": 3},
-    {"name": "AINews X 等社区汇总", "kind": "x_digest", "url": "https://news.smol.ai/rss.xml", "limit": 2}
-  ]
+    {
+      "name": "OpenAI 官方资讯",
+      "kind": "rss",
+      "url": "https://openai.com/news/rss.xml",
+      "category": "major_ai",
+      "limit": 6,
+      "window_hours": 72
+    },
+    {
+      "name": "Google AI 官方资讯",
+      "kind": "rss",
+      "url": "https://blog.google/technology/ai/rss/",
+      "category": "major_ai",
+      "limit": 6,
+      "window_hours": 72
+    },
+    {
+      "name": "Anthropic 官方公告",
+      "kind": "articles",
+      "url": "https://www.anthropic.com/news",
+      "article_pattern": "/news/[a-z0-9-]+",
+      "category": "major_ai",
+      "limit": 6,
+      "window_hours": 72,
+      "scan_limit": 6
+    },
+    {
+      "name": "Hugging Face 重要开源发布",
+      "kind": "rss",
+      "url": "https://huggingface.co/blog/feed.xml",
+      "category": "major_ai",
+      "limit": 4,
+      "window_hours": 72
+    },
+    {
+      "name": "GitHub 今日趋势",
+      "kind": "github_trending",
+      "url": "https://github.com/trending?since=daily",
+      "category": "github",
+      "limit": 8,
+      "scan_limit": 8,
+      "min_stars": 1000,
+      "window_hours": 24
+    },
+    {
+      "name": "GitHub 高星 Skills",
+      "kind": "github_search",
+      "url": "https://api.github.com/search/repositories",
+      "query": "stars:>=1000 archived:false fork:false skill in:name,description,topics",
+      "category": "github",
+      "limit": 6,
+      "scan_limit": 8,
+      "window_hours": 24
+    },
+    {
+      "name": "GitHub 高星自动化项目",
+      "kind": "github_search",
+      "url": "https://api.github.com/search/repositories",
+      "query": "stars:>=1000 archived:false fork:false automation in:name,description,topics",
+      "category": "github",
+      "limit": 6,
+      "scan_limit": 8,
+      "window_hours": 24
+    },
+    {
+      "name": "Ethan Mollick 原创应用文章",
+      "kind": "rss",
+      "url": "https://www.oneusefulthing.org/feed",
+      "category": "ai_tips",
+      "limit": 5,
+      "window_hours": 720,
+      "practical_excerpt": true
+    },
+    {
+      "name": "Simon Willison 原创实践",
+      "kind": "rss",
+      "url": "https://simonwillison.net/atom/everything/",
+      "category": "ai_tips",
+      "limit": 10,
+      "window_hours": 720,
+      "ai_filter": true,
+      "practical_excerpt": true,
+      "exclude_pattern": "^(Quoting |GPT |Claude |OpenAI DevDay |2026 in LLMs|SF October|Jev introduces)"
+    },
+    {
+      "name": "AINews 指定X作者转述",
+      "kind": "x_excerpts",
+      "url": "https://news.smol.ai/rss.xml",
+      "category": "ai_tips",
+      "authors": [
+        "emollick",
+        "simonw",
+        "bcherny"
+      ],
+      "limit": 4,
+      "window_hours": 72
+    },
+    {
+      "name": "James Clear 成长通讯",
+      "kind": "articles",
+      "url": "https://jamesclear.com/3-2-1",
+      "article_pattern": "/3-2-1/[a-z]+-\\d+-\\d{4}",
+      "category": "growth",
+      "limit": 4,
+      "window_hours": 2160,
+      "scan_limit": 4
+    },
+    {
+      "name": "Stanford GSB 判断与成长",
+      "kind": "articles",
+      "url": "https://www.gsb.stanford.edu/insights",
+      "article_pattern": "/insights/[a-z0-9]+(?:-[a-z0-9]+){3,}",
+      "category": "growth",
+      "limit": 4,
+      "window_hours": 2160,
+      "scan_limit": 8
+    },
+    {
+      "name": "Berkeley Greater Good 实用成长",
+      "kind": "rss",
+      "url": "https://greatergood.berkeley.edu/site/rss/articles",
+      "category": "growth",
+      "limit": 5,
+      "window_hours": 2160
+    },
+    {
+      "name": "Nature 科研",
+      "kind": "rss",
+      "url": "https://www.nature.com/nature.rss",
+      "category": "research",
+      "limit": 8,
+      "window_hours": 168,
+      "exclude_pattern": "^(Retraction|Correction|Editorial|Obituary|Author Correction|Publisher Correction)",
+      "url_pattern": "/articles/s41586-"
+    },
+    {
+      "name": "APS 心理研究",
+      "kind": "rss",
+      "url": "https://www.psychologicalscience.org/feed",
+      "category": "psychology",
+      "limit": 6,
+      "window_hours": 720,
+      "exclude_pattern": "(APS Submits|Annual Convention|Award|Call for|Membership)"
+    },
+    {
+      "name": "Cleveland Clinic 日常健康",
+      "kind": "articles",
+      "url": "https://health.clevelandclinic.org/",
+      "article_pattern": "/[a-z0-9]+(?:-[a-z0-9]+){2,}",
+      "category": "health",
+      "limit": 5,
+      "window_hours": 2160,
+      "scan_limit": 6
+    }
+  ],
+  "dedup_days": 90,
+  "section_limits": {
+    "github": 3,
+    "ai_tips": 2,
+    "growth": 2,
+    "health": 1,
+    "research": 1,
+    "psychology": 1,
+    "major_ai": 3
+  }
 }

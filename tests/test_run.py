@@ -17,6 +17,48 @@ def response(result=RESULT, finish="stop"):
 
 
 class RunTests(unittest.TestCase):
+    def test_curated_quotas_and_source_category_are_enforced(self):
+        candidates = [dict(CANDIDATES[0], category="github"), dict(CANDIDATES[0], id="C002", category="health")]
+        selected = dict(RESULT["items"][0], category="github", action="查看原仓库的上手说明。", evidence_note="项目描述与GitHub星数。")
+        limits = {"github": 1, "health": 1}
+        result = validate_result({"items": [selected]}, {"C001", "C002"}, candidates, limits)
+        self.assertEqual(result[0]["category"], "github")
+        wrong = dict(selected, category="health")
+        extra = dict(selected, source_ids=["C002"])
+        for items in ([wrong], [selected, extra]):
+            with self.assertRaises(StopRun):
+                validate_result({"items": items}, {"C001", "C002"}, candidates, limits)
+        candidates[1]["category"] = "github"
+        with self.assertRaisesRegex(StopRun, "quota"):
+            validate_result({"items": [selected, extra]}, {"C001", "C002"}, candidates, limits)
+
+    def test_minor_ai_and_research_without_evidence_are_not_sent(self):
+        for category in ("major_ai", "health", "research", "psychology"):
+            candidates = [dict(CANDIDATES[0], category=category)]
+            item = dict(RESULT["items"][0], category=category)
+            with self.assertRaises(StopRun):
+                validate_result({"items": [item]}, {"C001"}, candidates, {category: 1})
+            item.update(major=True, evidence_note="摘录未提供研究对象和方法，不能推断因果。")
+            self.assertEqual(len(validate_result({"items": [item]}, {"C001"}, candidates, {category: 1})), 1)
+
+    def test_prompt_gives_all_sections_a_chance_under_size_limit(self):
+        candidates = [dict(CANDIDATES[0], id="G" + str(i), category="github", summary="工具" * 200) for i in range(30)]
+        candidates += [dict(CANDIDATES[0], id="H", category="health")]
+        messages, ids = build_messages(candidates, CONFIG)
+        self.assertIn("H", ids)
+        self.assertLessEqual(sum(len(m["content"].encode()) for m in messages), CONFIG["max_input_bytes"])
+
+    def test_curated_render_labels_observed_stars_and_missing_slots(self):
+        from digest.run import render
+        candidates = [dict(CANDIDATES[0], category="github", date_precision="observed", stars=1200, stars_today=None)]
+        items = [dict(RESULT["items"][0], category="github", action="阅读上手说明。", evidence_note="项目资料。")]
+        text = render(items, candidates, [], NOW, {"github": 3, "ai_tips": 2})
+        self.assertIn("热度采样", text)
+        self.assertIn("⭐ 1200", text)
+        self.assertNotIn("今日新增", text)
+        self.assertIn("GitHub 项目 1/3", text)
+        self.assertIn("不代表高赞排名", text)
+
     def test_model_endpoint_uses_configured_provider_path(self):
         self.assertEqual(model_url({"api_base": "https://api.790053500.com/v1/"}), "https://api.790053500.com/v1/chat/completions")
         for base in ["http://example.com/v1", "https://key@example.com/v1", "https://example.com/v1?key=private", "https://example.com/v1#fragment"]:

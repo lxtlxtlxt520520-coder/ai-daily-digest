@@ -81,7 +81,7 @@ def main():
             result = subprocess.run([sys.executable, "-m", "digest.run", "--live"], capture_output=True, text=True)
             if result.returncode:
                 if "No fresh candidates" in result.stderr or "No eligible candidates" in result.stderr or "No important items" in result.stderr:
-                    send("暂时没有适合生成日报的新资讯，未补入旧闻。稍后可以再发送 /digest。")
+                    send("暂时没有符合筛选要求、尚未推送的内容，未强行补足条数。稍后可以再发送 /digest。")
                     return
                 # digest.run emits only controlled error text, never tokens or response bodies.
                 reason = result.stderr.strip()[:300]
