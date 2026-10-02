@@ -1,28 +1,66 @@
 """Bounded public feed collection; no full articles, transcripts or login cookies."""
 import hashlib
 import html
+import ipaddress
 import json
 import os
 import re
+import socket
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
+from functools import lru_cache
 
 MAX_DOWNLOAD = 3_000_000
 AI_WORDS = re.compile(r"\b(ai|llm|gpt|claude|gemini|deepseek|openai|anthropic|agent|agents|ollama|vllm|transformers|qwen|llama|hugging)\b|人工智能|大模型", re.I)
 
 
+@lru_cache(maxsize=128)
+def proxy_addresses(host):
+    # Some local network proxies return benchmark-range synthetic IPs. Verify the
+    # public destination through DoH rather than allowing those ranges unchecked.
+    addresses = []
+    for kind in ("A", "AAAA"):
+        query = urllib.parse.urlencode({"name": host.encode("idna").decode(), "type": kind, "edns_client_subnet": "0.0.0.0/0"})
+        with urllib.request.urlopen("https://dns.google/resolve?" + query, timeout=10) as response:
+            data = json.loads(response.read(65536))
+        if data.get("Status") != 0:
+            raise ValueError("Public DNS verification failed")
+        addresses.extend(ipaddress.ip_address(record["data"]) for record in data.get("Answer", []) if record["type"] in {1, 28})
+    return addresses
+
+
+def public_url(url):
+    parts = urllib.parse.urlsplit(url)
+    if parts.scheme != "https" or not parts.hostname or parts.username or parts.password or parts.port not in {None, 443}:
+        raise ValueError("Only public HTTPS sources are allowed")
+    addresses = [ipaddress.ip_address(address[4][0]) for address in socket.getaddrinfo(parts.hostname, 443, type=socket.SOCK_STREAM)]
+    synthetic = (ipaddress.ip_network("198.18.0.0/15"), ipaddress.ip_network("2001:2::/48"))
+    if addresses and all(a.is_global or any(a in network for network in synthetic) for a in addresses) and any(not a.is_global for a in addresses):
+        try:
+            ipaddress.ip_address(parts.hostname)
+        except ValueError:
+            addresses = proxy_addresses(parts.hostname)
+    if not addresses or any(not address.is_global for address in addresses):
+        raise ValueError("Private or local sources are not allowed")
+
+
+class PublicRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, request, fp, code, message, headers, new_url):
+        public_url(new_url)
+        return super().redirect_request(request, fp, code, message, headers, new_url)
+
+
 def download(url, timeout=18):
-    if urllib.parse.urlsplit(url).scheme != "https":
-        raise ValueError("Only HTTPS sources are allowed")
+    public_url(url)
     headers = {"User-Agent": "AI-Daily-Digest/1.0", "Accept-Encoding": "identity"}
     request = urllib.request.Request(url, headers=headers)
     if urllib.parse.urlsplit(url).hostname == "api.github.com" and os.environ.get("GITHUB_TOKEN"):
         request.add_unredirected_header("Authorization", "Bearer " + os.environ["GITHUB_TOKEN"])
-    with urllib.request.urlopen(request, timeout=timeout) as response:
+    with urllib.request.build_opener(PublicRedirect()).open(request, timeout=timeout) as response:
         body = response.read(MAX_DOWNLOAD + 1)
     if len(body) > MAX_DOWNLOAD:
         raise ValueError("Source exceeded download limit")
@@ -55,6 +93,18 @@ def parse_date(value):
 
 def fingerprint(value):
     return hashlib.sha256(value.encode()).hexdigest()[:24]
+
+
+def publisher_order(records):
+    publishers, ordered = {}, []
+    for record in records:
+        publisher = record.get("publisher") or urllib.parse.urlsplit(record["url"]).hostname
+        publishers.setdefault(publisher, []).append(record)
+    while any(publishers.values()):
+        for articles in publishers.values():
+            if articles:
+                ordered.append(articles.pop(0))
+    return ordered
 
 
 def item(title, url, published, summary, source):
@@ -99,13 +149,23 @@ def parse_feed(body, source):
     return records
 
 
-def fetch_source(source, now, window_hours, fetch=download):
+def fetch_source(source, now, window_hours, fetch=download, sent_keys=()):
     window_hours = source.get("window_hours", window_hours)
     url = source["url"]
     failures = []
-    if source["kind"] in {"github_search", "github_trending"}:
+    if source["kind"] == "pubmed_search":
+        from .papers import fetch_papers
+        records = fetch_papers(source, now, fetch)
+    elif source["kind"] == "hn_search":
+        from .discovery import fetch_discussions
+        records = fetch_discussions(source, now, fetch, failures)
+        if failures and not records:
+            raise ValueError("All discovery article reads failed")
+    elif source["kind"] in {"github_search", "github_trending"}:
         from .projects import fetch_projects
-        records = fetch_projects(source, now, fetch)
+        records = fetch_projects(source, now, fetch, failures)
+        if failures and not records:
+            raise ValueError("All repository searches failed")
     elif source["kind"] == "articles":
         from .pages import fetch_articles
         records = fetch_articles(source, fetch, failures)
@@ -136,16 +196,18 @@ def fetch_source(source, now, window_hours, fetch=download):
              and (not source.get("url_pattern") or re.search(source["url_pattern"], r["url"]))
              and (not source.get("exclude_pattern") or not re.search(source["exclude_pattern"], r["title"], re.I))]
     fresh.sort(key=lambda r: r["published"], reverse=True)
-    return fresh[:source.get("limit", 6)], {"source": source["name"], "kind": source["kind"], "status": "partial" if failures else "ok",
+    eligible = publisher_order([r for r in fresh if not any(key in sent_keys for key in r["keys"])])
+    return eligible[:source.get("limit", 6)], {"source": source["name"], "kind": source["kind"], "status": "partial" if failures else "ok",
                                            "raw": len(records), "fresh": len(fresh), "article_failures": len(failures)}
 
 
 def collect(config, now=None, sent_keys=(), fetch=download):
     now = now or datetime.now(timezone.utc)
     sources = [s for s in config["sources"] if s.get("enabled", True)]
+    sent_keys = set(sent_keys)
     def read(source):
         try:
-            return fetch_source(source, now, config["window_hours"], fetch)
+            return fetch_source(source, now, config["window_hours"], fetch, sent_keys)
         except Exception as error:
             return [], {"source": source["name"], "kind": source["kind"], "status": "failed", "error": type(error).__name__}
     with ThreadPoolExecutor(max_workers=4) as pool:

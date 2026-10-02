@@ -24,13 +24,24 @@ def trending_repositories(body):
     return repositories
 
 
-def fetch_projects(source, now, fetch):
+def fetch_projects(source, now, fetch, failures=None):
     if source["kind"] == "github_search":
-        url = source["url"]
-        if source.get("query"):
-            query = source["query"] + " pushed:>=" + (now - timedelta(days=180)).date().isoformat()
-            url += "?" + urlencode({"q": query, "sort": "stars", "per_page": source.get("scan_limit", 8)})
-        repos = [(repo, None) for repo in json.loads(fetch(url))["items"]]
+        from .discovery import daily_queries
+        queries = daily_queries(source, now) if source.get("queries") else [source.get("query", "")]
+        repos = []
+        for query in queries:
+            url = source["url"]
+            if query:
+                query += " pushed:>=" + (now - timedelta(days=180)).date().isoformat()
+                if source.get("created_days"):
+                    query += " created:>=" + (now - timedelta(days=source["created_days"])).date().isoformat()
+                url += "?" + urlencode({"q": query, "sort": "stars", "per_page": source.get("scan_limit", 8)})
+            try:
+                repos.extend((repo, None) for repo in json.loads(fetch(url))["items"])
+            except (OSError, ValueError, KeyError) as error:
+                if failures is None:
+                    raise
+                failures.append(type(error).__name__)
     else:
         repos = []
         for name, growth in trending_repositories(fetch(source["url"]))[:source.get("scan_limit", 6)]:
@@ -39,7 +50,7 @@ def fetch_projects(source, now, fetch):
     records = []
     for repo, growth in repos:
         stars = repo.get("stargazers_count", 0)
-        if repo.get("archived") or repo.get("fork") or repo.get("disabled") or not RELEVANT.search(repo["full_name"] + " " + (repo.get("description") or "")):
+        if repo.get("archived") or repo.get("fork") or repo.get("disabled") or not RELEVANT.search(repo["full_name"] + " " + (repo.get("description") or "") + " " + " ".join(repo.get("topics", []))):
             continue
         if stars < source.get("min_stars", 1000) and not (stars >= 300 and growth is not None and growth >= 100):
             continue
@@ -51,7 +62,8 @@ def fetch_projects(source, now, fetch):
         record = item(repo["full_name"], repo["html_url"], now, evidence, source)
         if record:
             record.update({"observed_at": now.isoformat(), "date_precision": "observed", "stars": stars, "stars_today": growth,
-                           "pushed_at": repo.get("pushed_at"), "license": license_name})
+                           "pushed_at": repo.get("pushed_at"), "license": license_name,
+                           "discovery": "topic_search" if source["kind"] == "github_search" else "trending"})
             records.append(record)
     records.sort(key=lambda r: (r["stars_today"] or 0, r["stars"]), reverse=True)
     return records

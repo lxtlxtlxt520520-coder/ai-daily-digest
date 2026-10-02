@@ -1,6 +1,6 @@
 import unittest
 from datetime import datetime, timezone
-from digest.collect import canonical_url, collect, parse_feed
+from digest.collect import canonical_url, collect, parse_feed, publisher_order
 
 NOW = datetime(2026, 10, 2, 0, 0, tzinfo=timezone.utc)
 SOURCE = {"name": "test", "kind": "rss", "url": "https://example.com/rss"}
@@ -8,6 +8,12 @@ RSS = b'''<rss><channel><item><title>New AI model</title><link>https://example.c
 
 
 class CollectionTests(unittest.TestCase):
+    def test_source_limit_does_not_hide_a_second_original_publisher(self):
+        records = [dict(url="https://pubmed.ncbi.nlm.nih.gov/" + str(i), publisher="Journal A") for i in range(10)]
+        records.append(dict(url="https://pubmed.ncbi.nlm.nih.gov/99", publisher="Journal B"))
+        first_two = publisher_order(records)[:2]
+        self.assertEqual({r['publisher'] for r in first_two}, {'Journal A', 'Journal B'})
+
     def test_source_window_and_rdf_date_do_not_fake_freshness(self):
         rdf = b'''<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns="http://purl.org/rss/1.0/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:content="http://purl.org/rss/1.0/modules/content/"><item><title>Health research</title><link>https://example.com/health</link><dc:date>2026-09-20</dc:date><content:encoded>Human study</content:encoded></item></rdf:RDF>'''
         source = dict(SOURCE, category="health", window_hours=720)

@@ -3,8 +3,8 @@
   "model": "gpt-6.1-sol",
   "reasoning_effort": "medium",
   "window_hours": 24,
-  "max_candidates": 56,
-  "max_input_bytes": 28000,
+  "max_candidates": 80,
+  "max_input_bytes": 48000,
   "max_completion_tokens": 8192,
   "sources": [
     {
@@ -42,6 +42,18 @@
       "window_hours": 72
     },
     {
+      "name": "GitHub 新兴项目搜索",
+      "kind": "github_search",
+      "url": "https://api.github.com/search/repositories",
+      "category": "github",
+      "query": "stars:>=300 archived:false fork:false (agent OR automation OR mcp OR skill) in:name,description,topics",
+      "created_days": 90,
+      "min_stars": 300,
+      "scan_limit": 20,
+      "limit": 6,
+      "window_hours": 24
+    },
+    {
       "name": "GitHub 今日趋势",
       "kind": "github_trending",
       "url": "https://github.com/trending?since=daily",
@@ -52,24 +64,58 @@
       "window_hours": 24
     },
     {
-      "name": "GitHub 高星 Skills",
+      "name": "GitHub Skills与Agent主题搜索",
       "kind": "github_search",
       "url": "https://api.github.com/search/repositories",
-      "query": "stars:>=1000 archived:false fork:false skill in:name,description,topics",
       "category": "github",
-      "limit": 6,
-      "scan_limit": 8,
-      "window_hours": 24
+      "limit": 8,
+      "scan_limit": 20,
+      "window_hours": 24,
+      "queries": [
+        "stars:>=1000 archived:false fork:false skill in:name,description,topics",
+        "stars:>=1000 archived:false fork:false mcp in:name,description,topics",
+        "stars:>=1000 archived:false fork:false agent in:name,description,topics",
+        "stars:>=1000 archived:false fork:false knowledge in:name,description,topics"
+      ],
+      "queries_per_run": 2
     },
     {
-      "name": "GitHub 高星自动化项目",
+      "name": "GitHub 实用工具主题搜索",
       "kind": "github_search",
       "url": "https://api.github.com/search/repositories",
-      "query": "stars:>=1000 archived:false fork:false automation in:name,description,topics",
       "category": "github",
-      "limit": 6,
-      "scan_limit": 8,
-      "window_hours": 24
+      "limit": 8,
+      "scan_limit": 20,
+      "window_hours": 24,
+      "queries": [
+        "stars:>=1000 archived:false fork:false automation in:name,description,topics",
+        "stars:>=1000 archived:false fork:false workflow in:name,description,topics",
+        "stars:>=1000 archived:false fork:false research in:name,description,topics",
+        "stars:>=1000 archived:false fork:false productivity in:name,description,topics"
+      ],
+      "queries_per_run": 2
+    },
+    {
+      "name": "社区主题检索（AI技巧）",
+      "kind": "hn_search",
+      "url": "https://hn.algolia.com/api/v1/search",
+      "category": "ai_tips",
+      "queries": [
+        "Claude Code",
+        "Codex",
+        "LLM workflow",
+        "prompt",
+        "AI automation",
+        "MCP"
+      ],
+      "queries_per_run": 2,
+      "min_points": 15,
+      "scan_limit": 6,
+      "limit": 5,
+      "window_hours": 720,
+      "ai_filter": true,
+      "include_pattern": "(workflow|tutorial|guide|prompt|how to|tools|coding agents|agent|automation|tips|skills)",
+      "exclude_pattern": "(missile|Houthis|funding|valuation|lawsuit|changelog| AGENTS.md|telemetry|Siri|benchmark)"
     },
     {
       "name": "Ethan Mollick 原创应用文章",
@@ -92,17 +138,33 @@
       "exclude_pattern": "^(Quoting |GPT |Claude |OpenAI DevDay |2026 in LLMs|SF October|Jev introduces)"
     },
     {
-      "name": "AINews 指定X作者转述",
+      "name": "AINews 跨作者X技巧转述",
       "kind": "x_excerpts",
       "url": "https://news.smol.ai/rss.xml",
       "category": "ai_tips",
-      "authors": [
-        "emollick",
-        "simonw",
-        "bcherny"
-      ],
-      "limit": 4,
+      "limit": 6,
       "window_hours": 72
+    },
+    {
+      "name": "社区主题检索（成长）",
+      "kind": "hn_search",
+      "url": "https://hn.algolia.com/api/v1/search",
+      "category": "growth",
+      "queries": [
+        "habits",
+        "decision making",
+        "learning how",
+        "communication",
+        "focus",
+        "productivity"
+      ],
+      "queries_per_run": 2,
+      "min_points": 20,
+      "scan_limit": 6,
+      "limit": 5,
+      "window_hours": 2160,
+      "include_pattern": "(learn|habit|decision|communicat|focus|productiv|memory|attention|procrastinat)",
+      "exclude_pattern": "(machine learning|reinforcement|SQLite|OpenGL|antidepressant|solar panels|continual learning|model|GPU|VRAM|embedding|AI company)"
     },
     {
       "name": "James Clear 成长通讯",
@@ -133,6 +195,16 @@
       "window_hours": 2160
     },
     {
+      "name": "PubMed 科研主题搜索",
+      "kind": "pubmed_search",
+      "url": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/",
+      "category": "research",
+      "query": "(microbiome[Title] OR \"human learning\"[Title] OR \"sleep and memory\"[Title] OR \"decision making\"[Title]) AND hasabstract[text] NOT (review[pt] OR editorial[pt] OR case reports[pt])",
+      "scan_limit": 20,
+      "limit": 5,
+      "window_hours": 720
+    },
+    {
       "name": "Nature 科研",
       "kind": "rss",
       "url": "https://www.nature.com/nature.rss",
@@ -143,6 +215,17 @@
       "url_pattern": "/articles/s41586-"
     },
     {
+      "name": "PubMed 心理学主题搜索",
+      "kind": "pubmed_search",
+      "url": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/",
+      "category": "psychology",
+      "query": "(\"emotion regulation\"[Title] OR \"social connection\"[Title] OR \"cognitive bias\"[Title] OR \"attention control\"[Title] OR mindfulness[Title]) AND humans[mh] AND hasabstract[text] NOT (drug[Title] OR cancer[Title] OR case reports[pt])",
+      "scan_limit": 20,
+      "limit": 5,
+      "window_hours": 1440,
+      "exclude_pattern": "(neural network|generative|deep learning|machine learning|spectral|GAN|contrastive)"
+    },
+    {
       "name": "APS 心理研究",
       "kind": "rss",
       "url": "https://www.psychologicalscience.org/feed",
@@ -150,6 +233,17 @@
       "limit": 6,
       "window_hours": 720,
       "exclude_pattern": "(APS Submits|Annual Convention|Award|Call for|Membership)"
+    },
+    {
+      "name": "PubMed 日常健康主题搜索",
+      "kind": "pubmed_search",
+      "url": "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/",
+      "category": "health",
+      "query": "(\"sleep quality\"[Title] OR \"sleep duration\"[Title] OR \"physical activity\"[Title] OR sedentary[Title] OR \"dietary pattern\"[Title]) AND (systematic review[pt] OR meta-analysis[pt]) AND humans[mh] NOT (drug[Title] OR supplement[Title] OR cancer[Title] OR surgery[Title] OR surgical[Title] OR patients[Title] OR disease[Title])",
+      "scan_limit": 20,
+      "limit": 5,
+      "window_hours": 1440,
+      "exclude_pattern": "(tonsil|pharyng|surgery|surgical|ketogenic|capsaicin|creatine|cancer)|preterm|infant|therapeutic|stimulation|pain|sleep apnea"
     },
     {
       "name": "Cleveland Clinic 日常健康",

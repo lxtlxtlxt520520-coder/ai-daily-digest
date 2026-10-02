@@ -23,6 +23,11 @@ class PageTests(unittest.TestCase):
         self.assertEqual(records[0]["url"], "https://x.com/simonw/status/123")
         self.assertFalse(records[0]["heat_verified"])
         self.assertEqual(records[0]["evidence_type"], "community_excerpt")
+        source.pop("authors")
+        broader = fetch_x_excerpts(source, lambda u: body)
+        self.assertEqual(len(broader), 2)
+        self.assertEqual(broader[1]["publisher"], "@advertiser")
+        self.assertEqual(broader[1]["date_precision"], "report")
 
     def test_metadata_prefers_publication_over_modification_and_keeps_excerpt(self):
         page = Page(b'''<h1>Research title</h1><script type="application/ld+json">{"@graph":[{"@type":"Article","datePublished":"2026-09-20","dateModified":"2026-10-02","description":"Human participants"}]}</script><p>A study with human participants describes an association and its limitations.</p>''')

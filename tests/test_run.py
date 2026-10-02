@@ -17,6 +17,24 @@ def response(result=RESULT, finish="stop"):
 
 
 class RunTests(unittest.TestCase):
+    def test_different_publishers_get_prompt_space_before_one_authors_later_posts(self):
+        candidates = [dict(CANDIDATES[0], id="A" + str(i), category="ai_tips", publisher="author-a", summary="practical workflow " * 40) for i in range(30)]
+        candidates += [dict(CANDIDATES[0], id="B", category="ai_tips", publisher="new-author", discovery="topic_search", evidence_type="original_excerpt", discussion_points=80)]
+        messages, ids = build_messages(candidates, CONFIG)
+        self.assertIn("B", ids)
+        evidence = next(c for c in json.loads(messages[1]["content"])["candidates"] if c["id"] == "B")
+        self.assertEqual(evidence["discovery"], "topic_search")
+        self.assertEqual(evidence["discussion_points"], 80)
+        self.assertLessEqual(sum(len(m["content"].encode()) for m in messages), CONFIG["max_input_bytes"])
+
+    def test_search_results_keep_original_excerpt_and_community_heat_distinct(self):
+        from digest.run import render
+        candidates = [dict(CANDIDATES[0], category="research", publisher="Journal", evidence_type="research_abstract", discussion_points=50)]
+        items = [dict(RESULT["items"][0], category="research", evidence_note="原论文摘要，不能推断因果。")]
+        text = render(items, candidates, [], NOW, {"research": 1})
+        self.assertIn("原论文摘要，未阅读全文", text)
+        self.assertIn("HN社区分数 50", text)
+
     def test_curated_quotas_and_source_category_are_enforced(self):
         candidates = [dict(CANDIDATES[0], category="github"), dict(CANDIDATES[0], id="C002", category="health")]
         selected = dict(RESULT["items"][0], category="github", action="查看原仓库的上手说明。", evidence_note="项目描述与GitHub星数。")

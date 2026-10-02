@@ -134,10 +134,11 @@ def fetch_x_excerpts(source, fetch):
             for url, label in page.links:
                 parsed = urlsplit(url)
                 match = re.fullmatch(r"/([\w]+)/status/(\d+)/?", parsed.path)
-                if parsed.hostname not in {"x.com", "twitter.com", "www.twitter.com"} or not match or match[1].lower() not in source["authors"]:
+                if parsed.hostname not in {"x.com", "twitter.com", "www.twitter.com"} or not match or (source.get("authors") and match[1].lower() not in source["authors"]):
                     continue
                 record = item("@" + match[1] + " — " + clean(block, 120), "https://x.com" + parsed.path, published, block, source)
                 if record:
-                    record.update({"secondary_url": secondary_url, "evidence_type": "community_excerpt", "heat_verified": False})
+                    record.update({"secondary_url": secondary_url, "evidence_type": "community_excerpt", "heat_verified": False,
+                                   "publisher": "@" + match[1].lower(), "date_precision": "report"})
                     records.append(record)
     return records
